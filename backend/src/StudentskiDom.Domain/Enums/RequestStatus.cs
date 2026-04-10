@@ -1,0 +1,9 @@
+namespace StudentskiDom.Domain.Enums;
+
+public enum RequestStatus
+{
+    Pending = 0,
+    InProgress = 1,
+    Resolved = 2,
+    Rejected = 3
+}
