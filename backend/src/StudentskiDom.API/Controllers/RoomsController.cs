@@ -27,7 +27,7 @@ public class RoomsController : ControllerBase
     public async Task<ActionResult<RoomDto>> Create([FromBody] CreateRoomDto dto)
         => Ok(await _roomService.CreateRoomAsync(dto));
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Staff")]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<RoomDto>> Update(Guid id, [FromBody] UpdateRoomDto dto)
         => Ok(await _roomService.UpdateRoomAsync(id, dto));

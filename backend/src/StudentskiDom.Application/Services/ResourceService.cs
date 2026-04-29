@@ -14,13 +14,20 @@ public class ResourceService : IResourceService
 
     public async Task<List<ResourceDto>> GetAllResourcesAsync()
     {
-        return await _context.Resources.AsNoTracking()
+        var resources = await _context.Resources.AsNoTracking()
             .OrderBy(r => r.Name)
-            .Select(r => new ResourceDto
-            {
-                Id = r.Id, Name = r.Name, Description = r.Description,
-                ResourceType = r.ResourceType.ToString(), Location = r.Location, IsActive = r.IsActive
-            }).ToListAsync();
+            .ToListAsync();
+
+        return resources.Select(r => new ResourceDto
+        {
+            Id = r.Id, 
+            Name = r.Name, 
+            Description = r.Description,
+            ResourceType = r.ResourceType.ToString(), 
+            Location = r.Location, 
+            IsActive = r.IsActive && (r.UnavailableUntil == null || r.UnavailableUntil < DateTime.UtcNow), 
+            UnavailableUntil = r.UnavailableUntil
+        }).ToList();
     }
 
     public async Task<ResourceDto> GetResourceByIdAsync(Guid id)
@@ -28,8 +35,13 @@ public class ResourceService : IResourceService
         var r = await _context.Resources.FindAsync(id) ?? throw new KeyNotFoundException("Resource not found.");
         return new ResourceDto
         {
-            Id = r.Id, Name = r.Name, Description = r.Description,
-            ResourceType = r.ResourceType.ToString(), Location = r.Location, IsActive = r.IsActive
+            Id = r.Id, 
+            Name = r.Name, 
+            Description = r.Description,
+            ResourceType = r.ResourceType.ToString(), 
+            Location = r.Location, 
+            IsActive = r.IsActive && (r.UnavailableUntil == null || r.UnavailableUntil < DateTime.UtcNow), 
+            UnavailableUntil = r.UnavailableUntil
         };
     }
 
@@ -49,7 +61,9 @@ public class ResourceService : IResourceService
         return new ResourceDto
         {
             Id = resource.Id, Name = resource.Name, Description = resource.Description,
-            ResourceType = resource.ResourceType.ToString(), Location = resource.Location, IsActive = resource.IsActive
+            ResourceType = resource.ResourceType.ToString(), Location = resource.Location, 
+            IsActive = resource.IsActive && (resource.UnavailableUntil == null || resource.UnavailableUntil < DateTime.UtcNow), 
+            UnavailableUntil = resource.UnavailableUntil
         };
     }
 
@@ -62,12 +76,15 @@ public class ResourceService : IResourceService
         if (dto.ResourceType != null && Enum.TryParse<ResourceType>(dto.ResourceType, true, out var rt)) resource.ResourceType = rt;
         if (dto.Location != null) resource.Location = dto.Location;
         if (dto.IsActive.HasValue) resource.IsActive = dto.IsActive.Value;
+        if (dto.UnavailableUntil != null) resource.UnavailableUntil = dto.UnavailableUntil;
 
         await _context.SaveChangesAsync();
         return new ResourceDto
         {
             Id = resource.Id, Name = resource.Name, Description = resource.Description,
-            ResourceType = resource.ResourceType.ToString(), Location = resource.Location, IsActive = resource.IsActive
+            ResourceType = resource.ResourceType.ToString(), Location = resource.Location, 
+            IsActive = resource.IsActive && (resource.UnavailableUntil == null || resource.UnavailableUntil < DateTime.UtcNow), 
+            UnavailableUntil = resource.UnavailableUntil
         };
     }
 

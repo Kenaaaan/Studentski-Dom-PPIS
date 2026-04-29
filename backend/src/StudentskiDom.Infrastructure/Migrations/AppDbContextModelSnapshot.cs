@@ -230,6 +230,9 @@ namespace StudentskiDom.Infrastructure.Migrations
                     b.Property<DateTime?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("ResourceId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("RoomId")
                         .HasColumnType("uuid");
 
@@ -249,6 +252,8 @@ namespace StudentskiDom.Infrastructure.Migrations
                     b.HasIndex("AssignedToUserId");
 
                     b.HasIndex("RequestedByUserId");
+
+                    b.HasIndex("ResourceId");
 
                     b.HasIndex("RoomId");
 
@@ -322,6 +327,9 @@ namespace StudentskiDom.Infrastructure.Migrations
 
                     b.Property<int>("ResourceType")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UnavailableUntil")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
@@ -510,7 +518,7 @@ namespace StudentskiDom.Infrastructure.Migrations
                             Email = "admin@studentskidom.ba",
                             FirstName = "Admin",
                             LastName = "Adminović",
-                            PasswordHash = "$2a$11$tIctmXJSmbowkf.lIjr2l.ru4slaMMT7yMXDiwu3kZIoWVVWNPyv.",
+                            PasswordHash = "$2a$11$7352M.gj45i0ZcnBR5ck4uS.pjpI5qbKpGprqrkOYA222H.E9iQma",
                             PhoneNumber = "+38761000001",
                             Role = 1,
                             StudentStatus = 0,
@@ -523,7 +531,7 @@ namespace StudentskiDom.Infrastructure.Migrations
                             Email = "staff@studentskidom.ba",
                             FirstName = "Tehničar",
                             LastName = "Tehničarević",
-                            PasswordHash = "$2a$11$x2gNsrCKHCqawyfD0ZLtOug0Mt718Ot8UCSuc.Shx0JBSS.KKEPLW",
+                            PasswordHash = "$2a$11$/uFnDqLt3ylgvWirEqchPuUUoIYwzTvcnjofCmLgjyH8/Ytwexmwq",
                             PhoneNumber = "+38761000002",
                             Role = 2,
                             StudentStatus = 0,
@@ -536,7 +544,7 @@ namespace StudentskiDom.Infrastructure.Migrations
                             Email = "student@studentskidom.ba",
                             FirstName = "Student",
                             LastName = "Studentović",
-                            PasswordHash = "$2a$11$XZatqBSc46WICE9BVgY6YuDTm6q5mkTSK8DNBG.0sKCApqNwReYv.",
+                            PasswordHash = "$2a$11$FLje/3HeNVLcbwTb3Urt.OW0LOApw2OSgZ/mGxoQudyp1FalfAhky",
                             PhoneNumber = "+38761000003",
                             Role = 0,
                             StudentStatus = 0,
@@ -628,6 +636,10 @@ namespace StudentskiDom.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("StudentskiDom.Domain.Entities.Resource", "Resource")
+                        .WithMany()
+                        .HasForeignKey("ResourceId");
+
                     b.HasOne("StudentskiDom.Domain.Entities.Room", "Room")
                         .WithMany("Requests")
                         .HasForeignKey("RoomId")
@@ -636,6 +648,8 @@ namespace StudentskiDom.Infrastructure.Migrations
                     b.Navigation("AssignedToUser");
 
                     b.Navigation("RequestedByUser");
+
+                    b.Navigation("Resource");
 
                     b.Navigation("Room");
                 });

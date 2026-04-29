@@ -29,6 +29,7 @@ export interface Resource {
   resourceType: 'CommonArea' | 'StudyRoom' | 'Kitchen' | 'Gym' | 'Network' | 'Other';
   location?: string;
   isActive: boolean;
+  unavailableUntil?: string;
 }
 
 export interface AccessRight {
@@ -41,6 +42,7 @@ export interface AccessRight {
   grantedAt: string;
   expiresAt?: string;
   grantedByUserId: string;
+  grantedByName?: string;
   reason?: string;
   resourceName?: string;
   roomNumber?: string;
@@ -50,18 +52,22 @@ export interface AccessRight {
 export interface Request {
   id: string;
   requestedByUserId: string;
+  requestedByName: string;
   roomId?: string;
-  requestType: 'Maintenance' | 'InventoryReplacement' | 'ResidenceCertificate' | 'Complaint' | 'Other';
+  roomNumber?: string;
+  resourceId?: string;
+  resourceName?: string;
+  requestType: 'Maintenance' | 'InventoryReplacement' | 'ResidenceCertificate' | 'AccessRequest';
   title: string;
   description: string;
   status: 'Pending' | 'InProgress' | 'Resolved' | 'Rejected';
-  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
   assignedToUserId?: string;
+  assignedToName?: string;
   createdAt: string;
   updatedAt: string;
   resolvedAt?: string;
-  authorName?: string;
-  assigneeName?: string;
+  commentCount: number;
 }
 
 export interface Comment {

@@ -36,8 +36,8 @@ export default function DashboardLayout({
     // Admin/Staff routes
     { name: 'Upravljanje Zahtjevima', href: '/admin/requests', icon: FileText, hidden: !isAdminOrStaff },
     { name: 'Prava Pristupa', href: '/admin/access', icon: Key, hidden: !isAdminOrStaff },
-    { name: 'Korisnici', href: '/admin/users', icon: Users, hidden: user?.role !== 'Admin' },
-    { name: 'Sobe / Resursi', href: '/admin/resources', icon: Building2, hidden: user?.role !== 'Admin' },
+    { name: 'Korisnici', href: '/admin/users', icon: Users, hidden: !isAdminOrStaff },
+    { name: 'Sobe / Resursi', href: '/admin/resources', icon: Building2, hidden: !isAdminOrStaff },
   ].filter(item => !item.hidden);
 
   return (

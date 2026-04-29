@@ -4,5 +4,6 @@ public enum RequestType
 {
     Maintenance = 0,
     InventoryReplacement = 1,
-    ResidenceCertificate = 2
+    ResidenceCertificate = 2,
+    AccessRequest = 3
 }

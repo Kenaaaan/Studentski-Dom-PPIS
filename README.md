@@ -112,3 +112,6 @@ npm install
 npm run dev
 ```
 Navigate to `http://localhost:3000`.
+
+Email: admin@studentskidom.ba (ili staff@studentskidom.ba za tehničara)
+Lozinka: Admin123! (respektivno Staff123!)

@@ -27,7 +27,10 @@ public class AccessRightService : IAccessRightService
 
     public async Task<List<AccessRightDto>> GetAccessRightsByUserIdAsync(Guid userId)
     {
-        return await _context.AccessRights
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) return new List<AccessRightDto>();
+
+        var rights = await _context.AccessRights
             .AsNoTracking()
             .Include(a => a.User)
             .Include(a => a.Room)
@@ -37,6 +40,47 @@ public class AccessRightService : IAccessRightService
             .OrderByDescending(a => a.GrantedAt)
             .Select(a => MapToDto(a))
             .ToListAsync();
+
+        if (user.Role == UserRole.Student)
+        {
+            // Dodajemo zadane (virtualne) pristupe za sve studente
+            var defaultResourceTypes = new List<(ResourceType Type, string AccessType, string Reason)>
+            {
+                (ResourceType.Network, "Network", "Automatski dodijeljen pristup mreži (WiFi)"),
+                (ResourceType.StudyRoom, "StudyRoom", "Zadani pristup čitaonici za sve stanare"),
+                (ResourceType.Gym, "Gym", "Zadani pristup teretani za sve stanare"),
+                (ResourceType.Kitchen, "Kitchen", "Zadani pristup zajedničkim kuhinjama"),
+                (ResourceType.CommonRoom, "CommonRoom", "Zadani pristup kafeteriji i zajedničkim prostorijama")
+            };
+
+            foreach (var def in defaultResourceTypes)
+            {
+                if (!rights.Any(r => r.AccessType == def.AccessType))
+                {
+                    var resource = await _context.Resources
+                        .FirstOrDefaultAsync(r => r.ResourceType == def.Type && r.IsActive);
+
+                    if (resource != null)
+                    {
+                        rights.Add(new AccessRightDto
+                        {
+                            Id = Guid.Empty,
+                            UserId = userId,
+                            UserName = $"{user.FirstName} {user.LastName}",
+                            ResourceId = resource.Id,
+                            ResourceName = resource.Name,
+                            AccessType = def.AccessType,
+                            IsActive = true,
+                            GrantedAt = user.CreatedAt,
+                            GrantedByName = "Sistem",
+                            Reason = def.Reason
+                        });
+                    }
+                }
+            }
+        }
+
+        return rights;
     }
 
     public async Task<AccessRightDto> GrantAccessAsync(GrantAccessDto dto, Guid grantedByUserId)

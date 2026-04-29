@@ -33,6 +33,46 @@ public class UserService : IUserService
             .ToListAsync();
     }
 
+    public async Task<List<UserDto>> GetStaffUsersAsync()
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(u => u.Role == UserRole.Staff)
+            .OrderBy(u => u.LastName)
+            .Select(u => new UserDto
+            {
+                Id = u.Id,
+                FirstName = u.FirstName,
+                LastName = u.LastName,
+                Email = u.Email,
+                PhoneNumber = u.PhoneNumber,
+                Role = u.Role.ToString(),
+                StudentStatus = u.StudentStatus.ToString(),
+                CreatedAt = u.CreatedAt
+            })
+            .ToListAsync();
+    }
+
+    public async Task<List<UserDto>> GetStudentUsersAsync()
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(u => u.Role == UserRole.Student)
+            .OrderBy(u => u.LastName)
+            .Select(u => new UserDto
+            {
+                Id = u.Id,
+                FirstName = u.FirstName,
+                LastName = u.LastName,
+                Email = u.Email,
+                PhoneNumber = u.PhoneNumber,
+                Role = u.Role.ToString(),
+                StudentStatus = u.StudentStatus.ToString(),
+                CreatedAt = u.CreatedAt
+            })
+            .ToListAsync();
+    }
+
     public async Task<UserDto> GetUserByIdAsync(Guid id)
     {
         var user = await _context.Users.FindAsync(id);
@@ -99,5 +139,14 @@ public class UserService : IUserService
             StudentStatus = user.StudentStatus.ToString(),
             CreatedAt = user.CreatedAt
         };
+    }
+
+    public async Task DeleteUserAsync(Guid id)
+    {
+        var user = await _context.Users.FindAsync(id);
+        if (user == null) throw new KeyNotFoundException("User not found.");
+
+        _context.Users.Remove(user);
+        await _context.SaveChangesAsync();
     }
 }

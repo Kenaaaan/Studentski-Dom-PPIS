@@ -8,6 +8,7 @@ import { FileText, Plus, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucid
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<Request[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const { user } = useAuth();
@@ -16,13 +17,18 @@ export default function RequestsPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [requestType, setRequestType] = useState('Maintenance');
+  const [selectedResourceId, setSelectedResourceId] = useState('');
 
   const fetchRequests = async () => {
     try {
-      const response = await api.get('/requests/my');
-      setRequests(response.data);
+      const [reqRes, resRes] = await Promise.all([
+        api.get('/requests/my'),
+        api.get('/resources')
+      ]);
+      setRequests(reqRes.data);
+      setResources(resRes.data.filter((r: any) => r.isActive));
     } catch (error) {
-      console.error('Failed to fetch requests', error);
+      console.error('Failed to fetch data', error);
     } finally {
       setLoading(false);
     }
@@ -39,6 +45,7 @@ export default function RequestsPage() {
         title,
         description,
         requestType,
+        resourceId: requestType === 'AccessRequest' ? selectedResourceId : null,
         priority: 'Medium', // Default for students
       });
       setShowModal(false);
@@ -47,6 +54,7 @@ export default function RequestsPage() {
       setTitle('');
       setDescription('');
       setRequestType('Maintenance');
+      setSelectedResourceId('');
     } catch (error) {
       alert('Greška prilikom podnošenja zahtjeva.');
     }
@@ -103,7 +111,7 @@ export default function RequestsPage() {
                     <div className="mt-4 flex flex-wrap gap-4 text-xs text-gray-500">
                       <span>Tip: <strong className="font-medium text-gray-700">{req.requestType}</strong></span>
                       <span>Podneseno: {new Date(req.createdAt).toLocaleString('bs-BA')}</span>
-                      {req.assigneeName && <span>Zadužen: {req.assigneeName}</span>}
+                      {req.assignedToName && <span>Zadužen: {req.assignedToName}</span>}
                     </div>
                   </div>
                   <button className="text-sm font-medium text-indigo-600 hover:text-indigo-800 whitespace-nowrap self-start">
@@ -138,10 +146,26 @@ export default function RequestsPage() {
                     <option value="Maintenance">Tehničko Održavanje (Kvar)</option>
                     <option value="InventoryReplacement">Zamjena Inventara</option>
                     <option value="ResidenceCertificate">Potvrda o Boravku</option>
-                    <option value="Complaint">Žalba</option>
+                    <option value="AccessRequest">Zahtjev za Pristup (Resursi)</option>
                     <option value="Other">Ostalo</option>
                   </select>
                 </div>
+                {requestType === 'AccessRequest' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Odaberite Resurs</label>
+                    <select 
+                      value={selectedResourceId} 
+                      onChange={e => setSelectedResourceId(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500"
+                      required
+                    >
+                      <option value="">Odaberi resurs...</option>
+                      {resources.map(r => (
+                        <option key={r.id} value={r.id}>{r.name} ({r.location})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Naslov</label>
                   <input 

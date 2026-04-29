@@ -27,7 +27,7 @@ public class ResourcesController : ControllerBase
     public async Task<ActionResult<ResourceDto>> Create([FromBody] CreateResourceDto dto)
         => Ok(await _resourceService.CreateResourceAsync(dto));
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Staff")]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ResourceDto>> Update(Guid id, [FromBody] UpdateResourceDto dto)
         => Ok(await _resourceService.UpdateResourceAsync(id, dto));

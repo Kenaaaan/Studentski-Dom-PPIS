@@ -13,6 +13,7 @@ public class Request
     public Priority Priority { get; set; } = Priority.Medium;
     public Guid? AssignedToUserId { get; set; }
     public Guid? RoomId { get; set; }
+    public Guid? ResourceId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ResolvedAt { get; set; }
@@ -21,5 +22,6 @@ public class Request
     public User RequestedByUser { get; set; } = null!;
     public User? AssignedToUser { get; set; }
     public Room? Room { get; set; }
+    public Resource? Resource { get; set; }
     public ICollection<Comment> Comments { get; set; } = new List<Comment>();
 }

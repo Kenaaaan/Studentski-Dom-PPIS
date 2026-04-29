@@ -10,6 +10,7 @@ public class ResourceDto
     public string ResourceType { get; set; } = string.Empty;
     public string? Location { get; set; }
     public bool IsActive { get; set; }
+    public DateTime? UnavailableUntil { get; set; }
 }
 
 public class CreateResourceDto
@@ -42,4 +43,6 @@ public class UpdateResourceDto
     public string? Location { get; set; }
 
     public bool? IsActive { get; set; }
+
+    public DateTime? UnavailableUntil { get; set; }
 }

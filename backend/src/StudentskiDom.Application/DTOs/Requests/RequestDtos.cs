@@ -16,6 +16,8 @@ public class RequestDto
     public string? AssignedToName { get; set; }
     public Guid? RoomId { get; set; }
     public string? RoomNumber { get; set; }
+    public Guid? ResourceId { get; set; }
+    public string? ResourceName { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? ResolvedAt { get; set; }
@@ -38,6 +40,7 @@ public class CreateRequestDto
     public string Priority { get; set; } = "Medium";
 
     public Guid? RoomId { get; set; }
+    public Guid? ResourceId { get; set; }
 }
 
 public class UpdateRequestStatusDto
@@ -48,6 +51,5 @@ public class UpdateRequestStatusDto
 
 public class AssignRequestDto
 {
-    [Required]
-    public Guid AssignedToUserId { get; set; }
+    public Guid? AssignedToUserId { get; set; }
 }

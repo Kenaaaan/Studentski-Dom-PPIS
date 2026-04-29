@@ -24,7 +24,7 @@ public class AccessRightsController : ControllerBase
     public async Task<ActionResult<List<AccessRightDto>>> GetByUserId(Guid userId)
         => Ok(await _accessRightService.GetAccessRightsByUserIdAsync(userId));
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Staff")]
     [HttpPost]
     public async Task<ActionResult<AccessRightDto>> Grant([FromBody] GrantAccessDto dto)
     {
@@ -32,7 +32,7 @@ public class AccessRightsController : ControllerBase
         return Ok(await _accessRightService.GrantAccessAsync(dto, grantedBy));
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Staff")]
     [HttpPut("{id:guid}/revoke")]
     public async Task<ActionResult<AccessRightDto>> Revoke(Guid id)
         => Ok(await _accessRightService.RevokeAccessAsync(id));

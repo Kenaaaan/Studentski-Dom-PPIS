@@ -18,8 +18,12 @@ public class RequestsController : ControllerBase
     [Authorize(Roles = "Admin,Staff")]
     [HttpGet]
     public async Task<ActionResult<List<RequestDto>>> GetAll(
-        [FromQuery] string? status, [FromQuery] string? type, [FromQuery] string? search)
-        => Ok(await _requestService.GetAllRequestsAsync(status, type, search));
+        [FromQuery] string? status, [FromQuery] string? type, [FromQuery] string? search,
+        [FromQuery] string? priority, [FromQuery] Guid? assignedToUserId,
+        [FromQuery] Guid? requestedByUserId, [FromQuery] Guid? roomId)
+    {
+        return Ok(await _requestService.GetAllRequestsAsync(status, type, search, priority, assignedToUserId, requestedByUserId, roomId));
+    }
 
     [HttpGet("my")]
     public async Task<ActionResult<List<RequestDto>>> GetMyRequests([FromQuery] string? status)
@@ -30,7 +34,11 @@ public class RequestsController : ControllerBase
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<RequestDto>> GetById(Guid id)
-        => Ok(await _requestService.GetRequestByIdAsync(id));
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var role = User.FindFirstValue(ClaimTypes.Role)!;
+        return Ok(await _requestService.GetRequestByIdAsync(id, userId, role));
+    }
 
     [HttpPost]
     public async Task<ActionResult<RequestDto>> Create([FromBody] CreateRequestDto dto)
@@ -42,7 +50,11 @@ public class RequestsController : ControllerBase
     [Authorize(Roles = "Admin,Staff")]
     [HttpPut("{id:guid}/status")]
     public async Task<ActionResult<RequestDto>> UpdateStatus(Guid id, [FromBody] UpdateRequestStatusDto dto)
-        => Ok(await _requestService.UpdateRequestStatusAsync(id, dto));
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var role = User.FindFirstValue(ClaimTypes.Role)!;
+        return Ok(await _requestService.UpdateRequestStatusAsync(id, dto, userId, role));
+    }
 
     [Authorize(Roles = "Admin,Staff")]
     [HttpPut("{id:guid}/assign")]
