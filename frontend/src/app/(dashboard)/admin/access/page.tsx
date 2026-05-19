@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { AccessRight, User, Room, Resource } from '@/types';
-import { Shield, Search, Plus, Trash2, Key, X } from 'lucide-react';
+import { Shield, Search, Plus, Trash2, Key, X, Download } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { exportToExcel } from '@/lib/exportExcel';
 
 export default function AdminAccessPage() {
   const [accessRights, setAccessRights] = useState<AccessRight[]>([]);
@@ -103,13 +104,32 @@ export default function AdminAccessPage() {
           <p className="text-gray-500 mt-1">Dodjela i pregled prava pristupa sobama i resursima za studente</p>
         </div>
         
-        <button 
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium text-sm"
-        >
-          <Plus size={18} className="mr-2" />
-          Dodijeli Novi Pristup
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportToExcel<AccessRight>('pristupi', [
+              { header: 'Student',     accessor: a => a.userName || '' },
+              { header: 'Tip',         accessor: a => a.accessType },
+              { header: 'Resurs/Soba', accessor: a => a.accessType === 'Room' ? `Soba ${a.roomNumber || ''}` : (a.resourceName || '') },
+              { header: 'Status',      accessor: a => a.isActive ? 'Aktivno' : 'Isteklo' },
+              { header: 'Dodijeljeno', accessor: a => new Date(a.grantedAt) },
+              { header: 'Ističe',      accessor: a => a.expiresAt ? new Date(a.expiresAt) : '' },
+              { header: 'Dodijelio',   accessor: a => a.grantedByName || '' },
+              { header: 'Razlog',      accessor: a => a.reason || '' },
+            ], accessRights)}
+            disabled={loading || accessRights.length === 0}
+            className="inline-flex items-center justify-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download size={16} className="mr-2" />
+            Izvezi u Excel
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium text-sm"
+          >
+            <Plus size={18} className="mr-2" />
+            Dodijeli Novi Pristup
+          </button>
+        </div>
       </div>
 
       {/* Modal */}

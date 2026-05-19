@@ -7,11 +7,16 @@ import { Request, User, Room } from '@/types';
 import {
   FileText, Search, Filter, UserPlus, ChevronDown, X,
   Clock, CheckCircle, XCircle, AlertTriangle, Loader2,
-  MessageSquare, Building2
+  MessageSquare, Building2, Download
 } from 'lucide-react';
+import { exportToExcel } from '@/lib/exportExcel';
 
 const STATUS_OPTIONS = ['Pending', 'InProgress', 'Resolved', 'Rejected'] as const;
-const TYPE_OPTIONS = ['Maintenance', 'InventoryReplacement', 'ResidenceCertificate'] as const;
+const TYPE_OPTIONS = [
+  'Maintenance', 'InventoryReplacement', 'ResidenceCertificate', 'AccessRequest', 'Other',
+  'RoomChange', 'RoomRepair', 'CleaningService', 'KeyReplacement', 'GuestRegistration',
+  'InternetSupport', 'ParkingPermit', 'LaundryBooking', 'StorageRequest', 'ComplaintReport',
+] as const;
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Urgent'] as const;
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: typeof Clock }> = {
@@ -29,9 +34,21 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  Maintenance: 'Održavanje',
+  Maintenance:          'Održavanje',
   InventoryReplacement: 'Zamjena inventara',
-  ResidenceCertificate: 'Potvrda o stanovanju',
+  ResidenceCertificate: 'Potvrda o boravku',
+  AccessRequest:        'Zahtjev za pristup resursu',
+  Other:                'Ostalo',
+  RoomChange:           'Zamjena sobe',
+  RoomRepair:           'Popravka u sobi',
+  CleaningService:      'Usluga čišćenja',
+  KeyReplacement:       'Zamjena ključa/kartice',
+  GuestRegistration:    'Registracija gosta',
+  InternetSupport:      'Problem s internetom',
+  ParkingPermit:        'Dozvola za parking',
+  LaundryBooking:       'Rezervacija perionice',
+  StorageRequest:       'Zahtjev za ostavu',
+  ComplaintReport:      'Prijava problema/žalba',
 };
 
 interface Filters {
@@ -107,10 +124,12 @@ export default function AdminRequestsPage() {
   }, []);
 
   const handleAssign = async () => {
-    if (!assignModal.request || !selectedStaffId) return;
+    if (!assignModal.request) return;
     setActionLoading(true);
     try {
-      await api.put(`/requests/${assignModal.request.id}/assign`, { assignedToUserId: selectedStaffId });
+      await api.put(`/requests/${assignModal.request.id}/assign`, {
+        assignedToUserId: selectedStaffId || null,
+      });
       setAssignModal({ open: false, request: null });
       setSelectedStaffId('');
       fetchRequests();
@@ -136,6 +155,24 @@ export default function AdminRequestsPage() {
     }
   };
 
+  const handleExport = () => {
+    exportToExcel<Request>('zahtjevi', [
+      { header: 'Naslov',         accessor: r => r.title },
+      { header: 'Opis',           accessor: r => r.description },
+      { header: 'Tip',            accessor: r => TYPE_LABELS[r.requestType] || r.requestType },
+      { header: 'Status',         accessor: r => STATUS_CONFIG[r.status]?.label || r.status },
+      { header: 'Prioritet',      accessor: r => PRIORITY_CONFIG[r.priority]?.label || r.priority },
+      { header: 'Podnosilac',     accessor: r => r.requestedByName || '' },
+      { header: 'Dodijeljeno',    accessor: r => r.assignedToName || '' },
+      { header: 'Soba',           accessor: r => r.roomNumber || '' },
+      { header: 'Resurs',         accessor: r => r.resourceName || '' },
+      { header: 'Komentara',      accessor: r => r.commentCount },
+      { header: 'Kreirano',       accessor: r => new Date(r.createdAt) },
+      { header: 'Ažurirano',      accessor: r => new Date(r.updatedAt) },
+      { header: 'Riješeno',       accessor: r => r.resolvedAt ? new Date(r.resolvedAt) : '' },
+    ], requests);
+  };
+
   const activeFilterCount = Object.values(filters).filter(v => v !== '').length;
 
   const resetFilters = () => setFilters(emptyFilters);
@@ -157,8 +194,15 @@ export default function AdminRequestsPage() {
             Pregled svih zahtjeva studenata — filtriranje, dodjela i ažuriranje statusa
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">{requests.length} zahtjev(a)</span>
+          <button
+            onClick={handleExport}
+            disabled={loading || requests.length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download size={16} /> Izvezi u Excel
+          </button>
         </div>
       </div>
 
@@ -318,19 +362,20 @@ export default function AdminRequestsPage() {
         <Modal title="Dodijeli zahtjev" onClose={() => { setAssignModal({ open: false, request: null }); setSelectedStaffId(''); }}>
           <p className="text-sm text-gray-600 mb-1">Zahtjev: <strong>{assignModal.request.title}</strong></p>
           <p className="text-xs text-gray-400 mb-4">Podnosilac: {assignModal.request.requestedByName}</p>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Dodijeli korisniku (Staff/Admin)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Dodijeli korisniku (Staff)</label>
           <select
             value={selectedStaffId}
             onChange={e => setSelectedStaffId(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-1"
           >
-            <option value="">— Odaberi —</option>
+            <option value="">— Ukloni dodjelu —</option>
             {staffUsers.map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.role})</option>)}
           </select>
+          <p className="text-xs text-gray-400 mb-4">Odaberi osoblje da dodijeliš, ili ostavi prazno da ukloniš dodjelu.</p>
           <div className="flex justify-end gap-2">
             <button onClick={() => setAssignModal({ open: false, request: null })} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Otkaži</button>
-            <button onClick={handleAssign} disabled={!selectedStaffId || actionLoading} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50">
-              {actionLoading ? 'Dodjeljujem...' : 'Dodijeli'}
+            <button onClick={handleAssign} disabled={actionLoading} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50">
+              {actionLoading ? 'Spremam...' : selectedStaffId ? 'Dodijeli' : 'Ukloni dodjelu'}
             </button>
           </div>
         </Modal>

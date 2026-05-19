@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { Room, Resource } from '@/types';
-import { Building2, Home, Package, CheckCircle, XCircle } from 'lucide-react';
+import { Building2, Home, Package, CheckCircle, XCircle, Download } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { exportToExcel } from '@/lib/exportExcel';
 
 export default function AdminResourcesPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -66,6 +67,29 @@ export default function AdminResourcesPage() {
     }
   };
 
+  const handleExportRooms = () => {
+    const filtered = rooms.filter(r => buildingFilter === 'All' || r.building === buildingFilter);
+    exportToExcel<Room>('sobe', [
+      { header: 'Soba',     accessor: r => r.roomNumber },
+      { header: 'Zgrada',   accessor: r => r.building },
+      { header: 'Sprat',    accessor: r => r.floor },
+      { header: 'Tip',      accessor: r => r.roomType },
+      { header: 'Kapacitet',accessor: r => r.capacity },
+      { header: 'Status',   accessor: r => r.isAvailable ? 'Slobodna' : 'Zauzeta/Nedostupna' },
+    ], filtered);
+  };
+
+  const handleExportResources = () => {
+    exportToExcel<Resource>('resursi', [
+      { header: 'Naziv',         accessor: r => r.name },
+      { header: 'Opis',          accessor: r => r.description || '' },
+      { header: 'Tip',           accessor: r => r.resourceType },
+      { header: 'Lokacija',      accessor: r => r.location || '' },
+      { header: 'Status',        accessor: r => r.isActive ? 'Aktivan' : 'Neaktivan' },
+      { header: 'Nedostupan do', accessor: r => r.unavailableUntil ? new Date(r.unavailableUntil) : '' },
+    ], resources);
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -76,6 +100,13 @@ export default function AdminResourcesPage() {
           </h1>
           <p className="text-gray-500 mt-1">Konfiguracija i upravljanje raspoloživošću smještaja i zajedničkih resursa</p>
         </div>
+        <button
+          onClick={activeTab === 'rooms' ? handleExportRooms : handleExportResources}
+          disabled={loading || (activeTab === 'rooms' ? rooms.length === 0 : resources.length === 0)}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Download size={16} /> Izvezi u Excel
+        </button>
       </div>
 
       <div className="flex border-b border-gray-200">

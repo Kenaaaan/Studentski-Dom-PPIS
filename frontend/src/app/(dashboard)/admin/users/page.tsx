@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { User } from '@/types';
-import { Users, Search, Trash2 } from 'lucide-react';
+import { Users, Search, Trash2, Download } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { exportToExcel } from '@/lib/exportExcel';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -69,7 +70,17 @@ export default function AdminUsersPage() {
     }
   };
 
-  const filteredUsers = users.filter(u => 
+  const handleExport = () => {
+    exportToExcel<User>('korisnici', [
+      { header: 'Ime',     accessor: u => u.firstName },
+      { header: 'Prezime', accessor: u => u.lastName },
+      { header: 'Email',   accessor: u => u.email },
+      { header: 'Uloga',   accessor: u => u.role },
+      { header: 'Status',  accessor: u => u.studentStatus },
+    ], filteredUsers);
+  };
+
+  const filteredUsers = users.filter(u =>
     u.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -85,6 +96,13 @@ export default function AdminUsersPage() {
           </h1>
           <p className="text-gray-500 mt-1">Pregled i upravljanje svim korisnicima sistema</p>
         </div>
+        <button
+          onClick={handleExport}
+          disabled={loading || users.length === 0}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Download size={16} /> Izvezi u Excel
+        </button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">

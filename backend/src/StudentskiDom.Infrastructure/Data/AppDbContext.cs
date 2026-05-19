@@ -126,6 +126,11 @@ public class AppDbContext : DbContext, IAppDbContext
                 .WithMany(r => r.Requests)
                 .HasForeignKey(e => e.RoomId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.Resource)
+                .WithMany()
+                .HasForeignKey(e => e.ResourceId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Comment

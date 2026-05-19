@@ -4,17 +4,16 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { 
-  Home, 
-  Key, 
-  FileText, 
-  Settings, 
-  LogOut, 
-  Menu, 
+import {
+  Home,
+  Key,
+  FileText,
+  LogOut,
+  Menu,
   X,
   Users,
   Building2,
-  Box
+  ClipboardList
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -34,7 +33,8 @@ export default function DashboardLayout({
     { name: 'Moji Zahtjevi', href: '/dashboard/requests', icon: FileText, hidden: isAdminOrStaff },
     
     // Admin/Staff routes
-    { name: 'Upravljanje Zahtjevima', href: '/admin/requests', icon: FileText, hidden: !isAdminOrStaff },
+    { name: 'Upravljanje Zahtjevima', href: '/admin/requests', icon: FileText, hidden: user?.role !== 'Admin' },
+    { name: 'Moji Zadaci', href: '/admin/tasks', icon: ClipboardList, hidden: !isAdminOrStaff },
     { name: 'Prava Pristupa', href: '/admin/access', icon: Key, hidden: !isAdminOrStaff },
     { name: 'Korisnici', href: '/admin/users', icon: Users, hidden: !isAdminOrStaff },
     { name: 'Sobe / Resursi', href: '/admin/resources', icon: Building2, hidden: !isAdminOrStaff },

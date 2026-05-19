@@ -15,7 +15,7 @@ public class RequestsController : ControllerBase
 
     public RequestsController(IRequestService requestService) => _requestService = requestService;
 
-    [Authorize(Roles = "Admin,Staff")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<ActionResult<List<RequestDto>>> GetAll(
         [FromQuery] string? status, [FromQuery] string? type, [FromQuery] string? search,
@@ -30,6 +30,14 @@ public class RequestsController : ControllerBase
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         return Ok(await _requestService.GetRequestsByUserIdAsync(userId, status));
+    }
+
+    [Authorize(Roles = "Admin,Staff")]
+    [HttpGet("assigned")]
+    public async Task<ActionResult<List<RequestDto>>> GetAssigned()
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        return Ok(await _requestService.GetAssignedRequestsAsync(userId));
     }
 
     [HttpGet("{id:guid}")]
@@ -56,7 +64,7 @@ public class RequestsController : ControllerBase
         return Ok(await _requestService.UpdateRequestStatusAsync(id, dto, userId, role));
     }
 
-    [Authorize(Roles = "Admin,Staff")]
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id:guid}/assign")]
     public async Task<ActionResult<RequestDto>> Assign(Guid id, [FromBody] AssignRequestDto dto)
         => Ok(await _requestService.AssignRequestAsync(id, dto));

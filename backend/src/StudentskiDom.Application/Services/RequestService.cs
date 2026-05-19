@@ -66,6 +66,21 @@ public class RequestService : IRequestService
         return requests.Select(MapToDto).ToList();
     }
 
+    public async Task<List<RequestDto>> GetAssignedRequestsAsync(Guid userId)
+    {
+        var requests = await _context.Requests
+            .AsNoTracking()
+            .Include(r => r.RequestedByUser)
+            .Include(r => r.AssignedToUser)
+            .Include(r => r.Room)
+            .Include(r => r.Resource)
+            .Include(r => r.Comments)
+            .Where(r => r.AssignedToUserId == userId)
+            .OrderByDescending(r => r.UpdatedAt)
+            .ToListAsync();
+        return requests.Select(MapToDto).ToList();
+    }
+
     public async Task<RequestDto> GetRequestByIdAsync(Guid id, Guid userId, string role)
     {
         var request = await _context.Requests
@@ -78,10 +93,8 @@ public class RequestService : IRequestService
             .FirstOrDefaultAsync(r => r.Id == id)
             ?? throw new KeyNotFoundException("Request not found.");
 
-        if (role != "Admin" && role != "Staff" && request.RequestedByUserId != userId && request.AssignedToUserId != userId)
-        {
+        if (role != "Admin" && request.RequestedByUserId != userId && request.AssignedToUserId != userId)
             throw new UnauthorizedAccessException("You do not have permission to view this request.");
-        }
 
         return MapToDto(request);
     }
@@ -89,10 +102,12 @@ public class RequestService : IRequestService
     public async Task<RequestDto> CreateRequestAsync(CreateRequestDto dto, Guid userId)
     {
         if (!Enum.TryParse<RequestType>(dto.RequestType, true, out var requestType))
-            throw new ArgumentException("Invalid request type.");
+            throw new ArgumentException("Nepoznat tip zahtjeva.");
 
         if (!Enum.TryParse<Priority>(dto.Priority, true, out var priority))
             priority = Priority.Medium;
+
+        await ValidateNoDuplicateAsync(requestType, dto, userId);
 
         var request = new Request
         {
@@ -138,10 +153,8 @@ public class RequestService : IRequestService
             .FirstOrDefaultAsync(r => r.Id == id)
             ?? throw new KeyNotFoundException("Request not found.");
 
-        if (role != "Admin" && role != "Staff" && request.AssignedToUserId != userId)
-        {
-            throw new UnauthorizedAccessException("You do not have permission to update the status of this request.");
-        }
+        if (role != "Admin" && request.AssignedToUserId != userId)
+            throw new UnauthorizedAccessException("Možete ažurirati samo status zahtjeva koji su vam dodijeljeni.");
 
         request.Status = status;
         request.UpdatedAt = DateTime.UtcNow;
@@ -159,7 +172,9 @@ public class RequestService : IRequestService
                     UserId = request.RequestedByUserId,
                     RoomId = request.RoomId,
                     ResourceId = request.ResourceId,
-                    AccessType = request.ResourceId.HasValue ? AccessType.CommonArea : AccessType.Room,
+                    AccessType = request.ResourceId.HasValue
+                        ? (request.Resource?.ResourceType == ResourceType.Network ? AccessType.Network : AccessType.CommonArea)
+                        : AccessType.Room,
                     IsActive = true,
                     GrantedAt = DateTime.UtcNow,
                     GrantedByUserId = userId,
@@ -202,15 +217,99 @@ public class RequestService : IRequestService
 
         await _context.SaveChangesAsync();
 
-        // Reload assigned user
+        // Reload with all navigation props
         request = await _context.Requests
             .Include(r => r.RequestedByUser)
             .Include(r => r.AssignedToUser)
             .Include(r => r.Room)
+            .Include(r => r.Resource)
             .Include(r => r.Comments)
             .FirstAsync(r => r.Id == id);
 
         return MapToDto(request);
+    }
+
+    private async Task ValidateNoDuplicateAsync(RequestType requestType, CreateRequestDto dto, Guid userId)
+    {
+        if (requestType == RequestType.AccessRequest)
+        {
+            if (dto.ResourceId.HasValue)
+            {
+                // Block if real active access right exists in DB
+                var hasActiveRight = await _context.AccessRights
+                    .AnyAsync(ar => ar.UserId == userId && ar.ResourceId == dto.ResourceId && ar.IsActive);
+                if (hasActiveRight)
+                    throw new InvalidOperationException("Već imate aktivan pristup ovom resursu.");
+
+                // Block if resource is a default type (all students get it automatically)
+                var defaultTypes = new[] { ResourceType.Network, ResourceType.StudyRoom, ResourceType.Gym, ResourceType.Kitchen, ResourceType.CommonRoom };
+                var user = await _context.Users.FindAsync(userId);
+                if (user?.Role == UserRole.Student)
+                {
+                    var resource = await _context.Resources.FindAsync(dto.ResourceId.Value);
+                    if (resource != null && defaultTypes.Contains(resource.ResourceType))
+                        throw new InvalidOperationException("Pristup ovom resursu je automatski dodijeljen svim stanarima.");
+                }
+
+                // Block if already has pending/in-progress AccessRequest for this resource
+                var hasPending = await _context.Requests
+                    .AnyAsync(r => r.RequestedByUserId == userId
+                        && r.RequestType == RequestType.AccessRequest
+                        && r.ResourceId == dto.ResourceId
+                        && (r.Status == RequestStatus.Pending || r.Status == RequestStatus.InProgress));
+                if (hasPending)
+                    throw new InvalidOperationException("Već imate aktivan zahtjev za ovaj resurs.");
+            }
+
+            if (dto.RoomId.HasValue)
+            {
+                var hasActiveRoomRight = await _context.AccessRights
+                    .AnyAsync(ar => ar.UserId == userId && ar.RoomId == dto.RoomId && ar.IsActive);
+                if (hasActiveRoomRight)
+                    throw new InvalidOperationException("Već imate aktivan pristup ovoj sobi.");
+
+                var hasPending = await _context.Requests
+                    .AnyAsync(r => r.RequestedByUserId == userId
+                        && r.RequestType == RequestType.AccessRequest
+                        && r.RoomId == dto.RoomId
+                        && (r.Status == RequestStatus.Pending || r.Status == RequestStatus.InProgress));
+                if (hasPending)
+                    throw new InvalidOperationException("Već imate aktivan zahtjev za ovu sobu.");
+            }
+        }
+
+        // Only one RoomChange request at a time
+        if (requestType == RequestType.RoomChange)
+        {
+            var hasActivePending = await _context.Requests
+                .AnyAsync(r => r.RequestedByUserId == userId
+                    && r.RequestType == RequestType.RoomChange
+                    && (r.Status == RequestStatus.Pending || r.Status == RequestStatus.InProgress));
+            if (hasActivePending)
+                throw new InvalidOperationException("Već imate aktivan zahtjev za zamjenu sobe. Sačekajte da bude riješen.");
+        }
+
+        // Only one ParkingPermit request at a time
+        if (requestType == RequestType.ParkingPermit)
+        {
+            var hasActivePending = await _context.Requests
+                .AnyAsync(r => r.RequestedByUserId == userId
+                    && r.RequestType == RequestType.ParkingPermit
+                    && (r.Status == RequestStatus.Pending || r.Status == RequestStatus.InProgress));
+            if (hasActivePending)
+                throw new InvalidOperationException("Već imate aktivan zahtjev za dozvolu parkinga.");
+        }
+
+        // Only one StorageRequest at a time
+        if (requestType == RequestType.StorageRequest)
+        {
+            var hasActivePending = await _context.Requests
+                .AnyAsync(r => r.RequestedByUserId == userId
+                    && r.RequestType == RequestType.StorageRequest
+                    && (r.Status == RequestStatus.Pending || r.Status == RequestStatus.InProgress));
+            if (hasActivePending)
+                throw new InvalidOperationException("Već imate aktivan zahtjev za ostavu.");
+        }
     }
 
     private static RequestDto MapToDto(Request r) => new()

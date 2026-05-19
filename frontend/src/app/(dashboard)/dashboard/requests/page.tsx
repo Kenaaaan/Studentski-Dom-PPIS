@@ -3,30 +3,60 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { Request } from '@/types';
-import { FileText, Plus, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Request, Resource, AccessRight } from '@/types';
+import { FileText, Plus, Clock, CheckCircle2, XCircle, AlertCircle, X } from 'lucide-react';
+
+const REQUEST_TYPES: { value: string; label: string; needsResource?: boolean }[] = [
+  // Pristup
+  { value: 'AccessRequest',       label: 'Zahtjev za pristup resursu',       needsResource: true },
+  { value: 'LaundryBooking',      label: 'Rezervacija perionice' },
+  { value: 'ParkingPermit',       label: 'Dozvola za parking' },
+  { value: 'StorageRequest',      label: 'Zahtjev za ostavu' },
+  // Soba
+  { value: 'RoomChange',          label: 'Zamjena sobe' },
+  { value: 'RoomRepair',          label: 'Popravka u sobi' },
+  { value: 'KeyReplacement',      label: 'Zamjena ključa / pristupne kartice' },
+  // Tehničko
+  { value: 'Maintenance',         label: 'Tehničko održavanje (kvar)' },
+  { value: 'InternetSupport',     label: 'Problem s internetom' },
+  { value: 'InventoryReplacement',label: 'Zamjena inventara' },
+  { value: 'CleaningService',     label: 'Usluga čišćenja' },
+  // Administrativno
+  { value: 'ResidenceCertificate',label: 'Potvrda o boravku' },
+  { value: 'GuestRegistration',   label: 'Registracija gosta' },
+  { value: 'ComplaintReport',     label: 'Prijava problema / žalba' },
+  { value: 'Other',               label: 'Ostalo' },
+];
+
+const TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  REQUEST_TYPES.map(t => [t.value, t.label])
+);
 
 export default function RequestsPage() {
+  const { user } = useAuth();
   const [requests, setRequests] = useState<Request[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
+  const [accessRights, setAccessRights] = useState<AccessRight[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const { user } = useAuth();
-  
-  // New request form state
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [requestType, setRequestType] = useState('Maintenance');
   const [selectedResourceId, setSelectedResourceId] = useState('');
 
-  const fetchRequests = async () => {
+  const fetchData = async () => {
     try {
-      const [reqRes, resRes] = await Promise.all([
+      const [reqRes, resRes, arRes] = await Promise.all([
         api.get('/requests/my'),
-        api.get('/resources')
+        api.get('/resources'),
+        user?.id ? api.get(`/access-rights/user/${user.id}`) : Promise.resolve({ data: [] }),
       ]);
       setRequests(reqRes.data);
-      setResources(resRes.data.filter((r: any) => r.isActive));
+      setResources(resRes.data.filter((r: Resource) => r.isActive));
+      setAccessRights((arRes.data as AccessRight[]).filter(ar => ar.isActive));
     } catch (error) {
       console.error('Failed to fetch data', error);
     } finally {
@@ -34,41 +64,76 @@ export default function RequestsPage() {
     }
   };
 
-  useEffect(() => {
-    fetchRequests();
-  }, []);
+  useEffect(() => { fetchData(); }, [user?.id]);
+
+  // Resources that the student can still request (no active access right AND no pending/in-progress request)
+  const pendingResourceIds = new Set(
+    requests
+      .filter(r => r.requestType === 'AccessRequest' && (r.status === 'Pending' || r.status === 'InProgress') && r.resourceId)
+      .map(r => r.resourceId!)
+  );
+  const grantedResourceIds = new Set(
+    accessRights.filter(ar => ar.resourceId).map(ar => ar.resourceId!)
+  );
+  const availableResources = resources.filter(
+    r => !grantedResourceIds.has(r.id) && !pendingResourceIds.has(r.id)
+  );
+
+  const handleTypeChange = (val: string) => {
+    setRequestType(val);
+    setSelectedResourceId('');
+    setSubmitError('');
+  };
+
+  const resetModal = () => {
+    setShowModal(false);
+    setTitle('');
+    setDescription('');
+    setRequestType('Maintenance');
+    setSelectedResourceId('');
+    setSubmitError('');
+  };
 
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError('');
+
+    const needsResource = REQUEST_TYPES.find(t => t.value === requestType)?.needsResource;
+    if (needsResource && !selectedResourceId) {
+      setSubmitError('Odaberite resurs za koji tražite pristup.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
       await api.post('/requests', {
         title,
         description,
         requestType,
-        resourceId: requestType === 'AccessRequest' ? selectedResourceId : null,
-        priority: 'Medium', // Default for students
+        resourceId: needsResource ? selectedResourceId || null : null,
+        priority: 'Medium',
       });
-      setShowModal(false);
-      fetchRequests(); // Refresh the list
-      // Reset form
-      setTitle('');
-      setDescription('');
-      setRequestType('Maintenance');
-      setSelectedResourceId('');
-    } catch (error) {
-      alert('Greška prilikom podnošenja zahtjeva.');
+      resetModal();
+      fetchData();
+    } catch (error: any) {
+      const msg = error?.response?.data?.error || 'Greška prilikom podnošenja zahtjeva.';
+      setSubmitError(msg);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'Pending': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800"><Clock size={14}/> Na čekanju</span>;
-      case 'InProgress': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800"><AlertCircle size={14}/> U obradi</span>;
-      case 'Resolved': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800"><CheckCircle2 size={14}/> Riješeno</span>;
-      case 'Rejected': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800"><XCircle size={14}/> Odbijeno</span>;
-      default: return null;
+      case 'Pending':    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800"><Clock size={13}/> Na čekanju</span>;
+      case 'InProgress': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800"><AlertCircle size={13}/> U obradi</span>;
+      case 'Resolved':   return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800"><CheckCircle2 size={13}/> Riješeno</span>;
+      case 'Rejected':   return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800"><XCircle size={13}/> Odbijeno</span>;
+      default:           return null;
     }
   };
+
+  const currentTypeNeedsResource = REQUEST_TYPES.find(t => t.value === requestType)?.needsResource;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -109,14 +174,12 @@ export default function RequestsPage() {
                     </div>
                     <p className="text-sm text-gray-600 mt-2 max-w-2xl">{req.description}</p>
                     <div className="mt-4 flex flex-wrap gap-4 text-xs text-gray-500">
-                      <span>Tip: <strong className="font-medium text-gray-700">{req.requestType}</strong></span>
+                      <span>Tip: <strong className="font-medium text-gray-700">{TYPE_LABELS[req.requestType] || req.requestType}</strong></span>
                       <span>Podneseno: {new Date(req.createdAt).toLocaleString('bs-BA')}</span>
-                      {req.assignedToName && <span>Zadužen: {req.assignedToName}</span>}
+                      {req.assignedToName && <span>Zadužen: <strong className="font-medium text-gray-700">{req.assignedToName}</strong></span>}
+                      {req.resourceName && <span>Resurs: <strong className="font-medium text-gray-700">{req.resourceName}</strong></span>}
                     </div>
                   </div>
-                  <button className="text-sm font-medium text-indigo-600 hover:text-indigo-800 whitespace-nowrap self-start">
-                    Vidi detalje →
-                  </button>
                 </div>
               </li>
             ))}
@@ -127,80 +190,95 @@ export default function RequestsPage() {
       {/* Create Request Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
               <h3 className="text-lg font-bold text-gray-900">Podnesi Novi Zahtjev</h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-500">
-                <XCircle size={24} />
+              <button onClick={resetModal} className="text-gray-400 hover:text-gray-500">
+                <X size={24} />
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto">
               <form onSubmit={handleCreateRequest} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tip Zahtjeva</label>
-                  <select 
-                    value={requestType} 
-                    onChange={e => setRequestType(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500"
+                  <select
+                    value={requestType}
+                    onChange={e => handleTypeChange(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
                   >
-                    <option value="Maintenance">Tehničko Održavanje (Kvar)</option>
-                    <option value="InventoryReplacement">Zamjena Inventara</option>
-                    <option value="ResidenceCertificate">Potvrda o Boravku</option>
-                    <option value="AccessRequest">Zahtjev za Pristup (Resursi)</option>
-                    <option value="Other">Ostalo</option>
+                    {REQUEST_TYPES.map(t => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
                   </select>
                 </div>
-                {requestType === 'AccessRequest' && (
+
+                {currentTypeNeedsResource && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Odaberite Resurs</label>
-                    <select 
-                      value={selectedResourceId} 
-                      onChange={e => setSelectedResourceId(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500"
-                      required
-                    >
-                      <option value="">Odaberi resurs...</option>
-                      {resources.map(r => (
-                        <option key={r.id} value={r.id}>{r.name} ({r.location})</option>
-                      ))}
-                    </select>
+                    {availableResources.length === 0 ? (
+                      <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        Već imate pristup svim dostupnim resursima ili imate aktivan zahtjev za njih.
+                      </p>
+                    ) : (
+                      <select
+                        value={selectedResourceId}
+                        onChange={e => setSelectedResourceId(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        required
+                      >
+                        <option value="">Odaberi resurs...</option>
+                        {availableResources.map(r => (
+                          <option key={r.id} value={r.id}>{r.name} — {r.location}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 )}
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Naslov</label>
-                  <input 
-                    type="text" 
-                    required 
-                    value={title} 
+                  <input
+                    type="text"
+                    required
+                    value={title}
                     onChange={e => setTitle(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Kratak opis problema"
+                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                    placeholder="Kratak opis problema ili zahtjeva"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Detaljan opis</label>
-                  <textarea 
-                    required 
-                    value={description} 
+                  <textarea
+                    required
+                    value={description}
                     onChange={e => setDescription(e.target.value)}
                     rows={4}
-                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
                     placeholder="Opišite detaljno šta vam je potrebno..."
-                  ></textarea>
+                  />
                 </div>
-                <div className="pt-4 flex gap-3">
-                  <button 
-                    type="button" 
-                    onClick={() => setShowModal(false)}
-                    className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+
+                {submitError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
+                    {submitError}
+                  </div>
+                )}
+
+                <div className="pt-2 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={resetModal}
+                    className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 text-sm"
                   >
                     Odustani
                   </button>
-                  <button 
+                  <button
                     type="submit"
-                    className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700"
+                    disabled={submitting || (currentTypeNeedsResource && availableResources.length === 0)}
+                    className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Pošalji Zahtjev
+                    {submitting ? 'Slanje...' : 'Pošalji Zahtjev'}
                   </button>
                 </div>
               </form>

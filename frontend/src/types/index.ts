@@ -57,7 +57,9 @@ export interface Request {
   roomNumber?: string;
   resourceId?: string;
   resourceName?: string;
-  requestType: 'Maintenance' | 'InventoryReplacement' | 'ResidenceCertificate' | 'AccessRequest';
+  requestType: 'Maintenance' | 'InventoryReplacement' | 'ResidenceCertificate' | 'AccessRequest' | 'Other'
+    | 'RoomChange' | 'RoomRepair' | 'CleaningService' | 'KeyReplacement' | 'GuestRegistration'
+    | 'InternetSupport' | 'ParkingPermit' | 'LaundryBooking' | 'StorageRequest' | 'ComplaintReport';
   title: string;
   description: string;
   status: 'Pending' | 'InProgress' | 'Resolved' | 'Rejected';
